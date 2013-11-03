@@ -4,11 +4,24 @@ package {
         public var x:Number;
         public var y:Number;
 
+        public var history:Vector.<Vector2>;
+
         public function Vector2(x:Number = 0, y:Number = 0) {
             this.x = x;
             this.y = y;
+
+            history = new Vector.<Vector2>();
         }
 
+        public function store():void {
+            history.push(this.copy());
+        }
+
+        public function restore():void {
+            var v:Vector2 = history.pop();
+            x = v.x;
+            y = v.y;
+        }
 
         public function cross(v:Vector2):Number {
             return this.x * v.y - this.y * v.x;
@@ -32,6 +45,11 @@ package {
 
         public function len():Number {
             return Math.sqrt(Math.pow(x, 2) + Math.pow(y, 2));
+        }
+
+        public function normalize():Vector2 {
+            var length:Number = len();
+            return new Vector2( x / length, y / length);
         }
 
         public function copy():Vector2 {

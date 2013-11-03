@@ -60,6 +60,15 @@ package {
             addChild(btn);
             btn.addEventListener(MouseEvent.MOUSE_UP, onToggle);
 
+/*
+            addPoint(293, 349);
+            addPoint(358, 287);
+            addPoint(440, 404);
+
+            marshmallow(new Vector2(295, 263));
+            marshmallow(new Vector2(449, 317));
+            marshmallow(new Vector2(339, 384));
+*/
 
         }
 
@@ -75,59 +84,10 @@ package {
         }
 
         private function generate():void {
-            for each (var poly:Polygon in positive_polygons) {
-                for each (var e:Edge in poly.edges) {
-                    var m:Vector2 = (e.v1.add(e.v2)).mul(0.5);
-                    m = m.add(e.normal1.mul(30));
-                    seeds.push(m);
-                }
-            }
-
-            for (var i:int = 0; i < seeds.length; ++i) {
-                var p:Vector2 = seeds[i];
-                trace("check: ", p);
-                if (!insidePolygon(positive_polygons, p)) {
-                    marshmallows(p.copy());
-                    positive_polygons = positive_polygons.concat(negative_polygons);
-                    negative_polygons.length = 0;
-                    trace("polygons ", positive_polygons.length);
-                }
-            }
         }
 
-        private function canMove(polys:Vector.<Polygon>, e:Edge):Boolean {
-            return inStage(e) && isColliding(polys, e) == null  && !insidePolygon(polys, e.v1) && !insidePolygon(polys, e.v2);
-        }
 
-        private function tryToMove(polys:Vector.<Polygon>, polygon:Polygon, newedge:Edge, edge:Edge):Boolean {
-            if (canMove(polys, newedge)) {
-                var temp1:Vector2 = edge.v1.copy();
-                var temp2:Vector2 = edge.v2.copy();
-                edge.v1.x = newedge.v1.x;
-                edge.v1.y = newedge.v1.y;
-
-                edge.v2.x = newedge.v2.x;
-                edge.v2.y = newedge.v2.y;
-
-                if (!polygon.isConvex()) {
-                    edge.v1.x = temp1.x;
-                    edge.v1.y = temp1.y;
-                    edge.v2.x = temp2.x;
-                    edge.v2.y = temp2.y;
-                }
-                else {
-                    return true;
-                }
-                
-            }
-
-            return false;
-            
-        }
-
-        private function marshmallows(seed:Vector2):void {
-            var stillgrowing:Boolean = true;
-            
+        private function createPolygon(seed:Vector2):Polygon {
             var points:Vector.<Vector2> = new Vector.<Vector2>();
             points.push(seed);
             points.push(new Vector2(seed.x + 1, seed.y));
@@ -136,105 +96,77 @@ package {
             var polygon:Polygon = new Polygon(points);
             polygon.color = 0xeeeeee;
             polygon.showPoints = false;
-            negative_polygons.push(polygon);
 
+            return polygon;
+        }
+
+        private function marshmallow(seed:Vector2):void {
+            negative_polygons.push(createPolygon(seed));
             var polys:Vector.<Polygon> = negative_polygons.concat(positive_polygons);
 
-            var counter:int = 0;
+            var stillgrowing:Boolean = true;
+
             while (stillgrowing) {
-                counter++;
                 stillgrowing = false;
+                
                 for each (var polygon:Polygon in negative_polygons) {
                     for (var i:int = 0; i < polygon.edges.length; ++i) {
-                        var e:Edge = polygon.edges[i];
+                        var edge:Edge = polygon.edges[i];
 
-                        if (!e.canGrow) {
-                            continue;
-                        }
-
-                        var e1:Edge = new Edge(e.v1.add(e.normal1), e.v2.add(e.normal2));
-
-                        if (tryToMove(polys, polygon, e1, e)) {
-                            stillgrowing = true;
-                        }
-                        else {
-
-                            var edge:Edge = getCollision(polys, e1);
-                            if (edge != null) {
-
-                                var dir:Vector2 = edge.v2.sub(edge.v1);
-                               
-                                if (dir.len() != 0 && ! ( edge in polygon.divided) ) {
-                                    polygon.divided[edge] = true;
-
-                                    if ( endIntersects(e1, edge) ) {
-                                        var nextEdge:Edge = polygon.edges[ ( i + 1 ) % polygon.edges.length ];
-                                        insertBetween(polygon, e, nextEdge, dir);
+                        for (var j:int = 0; j < 2; ++j) {
+                            if (edge.normals[j].len() > 0) {
+                                var dir_edge:Edge = edge.grow(j);
+                                var e1:Edge = isColliding(positive_polygons, dir_edge);
+                                var e2:Edge = isColliding(positive_polygons, edge);
+                                if ( inStage(edge.vertices[j]) && polygon.isConvex()) {
+                                    if (e1 == null && e2 == null && checkPolygon(positive_polygons, polygon)) {
                                         stillgrowing = true;
-
+                                    }
+                                    else if (e1 != null  && ! ( e1 in polygon.divided ) ) {
+                                        polygon.divided[e1] = true;
+                                        edge.reverse(j);
+                                        stillgrowing = true
+                                        var newedge:Edge = polygon.insertEdge(edge.vertices[j]);
+                                        newedge.normals[0] = (e1.vertices[1].sub(e1.vertices[0])).normalize();
+                                        newedge.normals[1] = (e1.vertices[0].sub(e1.vertices[1])).normalize();
+                                        e1.color = 0xff0000;
+                                        edge.normals[j] = new Vector2(0, 0);
 
                                     }
-                                    else if (beginningIntersects(e1, edge) ) {
-
-                                        var index:int = i - 1;
-                                        if (index < 0) {
-                                            index = polygon.edges.length - 1;
-                                        }
-                                        var prevEdge:Edge = polygon.edges[ index];
-                                        insertBetween(polygon, prevEdge, e, dir);
-                                        stillgrowing = true;
-
+                                    else {
+                                        edge.reverse(j);
                                     }
-
+                                }
+                                else {
+                                    edge.reverse(j);
                                 }
                             }
+
                         }
-                        
                     }
                 }
             }
+            
 
-        }
-
-        private function insertBetween(polygon:Polygon, e1:Edge, e2:Edge, dir:Vector2):void {
-            if (dir.x != 0 && dir.y != 0) {
-                if (Math.abs(e1.normal2.x) < Math.abs(e1.normal2.y) ) {
-                    e1.normal2 = dir.mul( 1 / Math.abs(dir.y) );
-                    e2.normal1 = dir.mul( -1 / Math.abs(dir.x) );
-                }
-                else {
-                    e1.normal2 = dir.mul( 1 / Math.abs(dir.x) );
-                    e2.normal1 = dir.mul( -1 / Math.abs(dir.y) );
-                }
-            }
-            else {
-                dir = dir.mul( 1 / dir.len());
-                e1.normal2 = dir.copy();
-                e2.normal1 = dir.mul( -1);
-            }
-                                    
-
-            var new_v:Vector2 = e1.v2.copy();
-            e1.v2 = new_v;
-
-            var new_edge:Edge = new Edge(e1.v2, e2.v1);
-            new_edge.canGrow = false;
-
-            var index:int = polygon.edges.indexOf(e1);
-            polygon.points.splice(index + 1, 0, e1.v2);
-            polygon.edges.splice(index + 1, 0, new_edge);
+            positive_polygons = positive_polygons.concat(negative_polygons);
+            negative_polygons.length = 0;
 
         }
 
 
-        
 
-        private function inStage(e:Edge):Boolean {
-            return pointInStage(e.v1) && pointInStage(e.v2);
-        }
-
-        private function pointInStage(p:Vector2):Boolean {
+        private function inStage(p:Vector2):Boolean {
             return ! ( p.x < 0 || p.x > stage.stageWidth || p.y < 0 || p.y > stage.stageHeight );
+        }
+
+        private function checkPolygon(polys:Vector.<Polygon>, p:Polygon):Boolean {
+            for each (var e:Edge in p.edges) {
+                if ( isColliding(polys, e) ) {
+                    return false;
+                }
+            }
+
+            return true;
         }
 
         private function isColliding(polys:Vector.<Polygon>, e:Edge):Edge {
@@ -249,80 +181,18 @@ package {
             return null;
         }
 
-        private function getCollision(polys:Vector.<Polygon>, e:Edge):Edge {
-            for each (var p:Polygon in polys) {
-                for each (var edge:Edge in p.edges) {
-                    if ( beginningIntersects( e, edge ) || endIntersects(e, edge ) ) {
-                        return edge;
-                    }
-                }
-            }
-       
-            return null;
-        }
-
-        private function findTS(e1:Edge, e2:Edge):Vector2 {
-            var result:Vector2;
-            var a:Vector2 = e1.v1;
-            var b:Vector2 = e1.v2.sub(e1.v1);
-
-            var c:Vector2 = e2.v1;
-            var d:Vector2 = e2.v2.sub(e2.v1);
-
-            
-            if (d.cross(b) != 0) {
-                var s:Number = a.sub(c).cross(b) / d.cross(b);
-                var t:Number = a.sub(c).cross(d) / d.cross(b);
-
-                result = new Vector2(t, s);
-
-            }
-
-            return result;
-            
-            
-        }
-
-        private function endIntersects(e1:Edge, e2:Edge):Boolean {
-            var ts:Vector2 = findTS(e1, e2);
-         
-            if (ts != null && ts.y > 0 && ts.y < 1) {
-                var b:Vector2 = e1.v2.sub(e1.v1);
-
-                if ( b.sub(b.mul(ts.x)).len() <= 2) {
-                    return true;
-                }
-            }
-
-            return false;
-        }
-
-        private function beginningIntersects(e1:Edge, e2:Edge):Boolean {
-            var ts:Vector2 = findTS(e1, e2);
-         
-            if (ts != null && ts.y > 0 && ts.y < 1) {
-                var b:Vector2 = e1.v2.sub(e1.v1);
-
-                if ( b.mul(ts.x).len() <= 2 ) {
-                    return true;
-                }
-            }
-
-            return false;
-        }
-        
 
 
         private function intersects(e1:Edge, e2:Edge):Boolean {
-            var a:Vector2 = e1.v1;
-            var b:Vector2 = e1.v2.sub(e1.v1);
+            var a:Vector2 = e1.vertices[0];
+            var b:Vector2 = e1.vertices[1].sub(e1.vertices[0]);
 
             if (b.len() == 0) {
                 return false;
             }
 
-            var c:Vector2 = e2.v1;
-            var d:Vector2 = e2.v2.sub(e2.v1);
+            var c:Vector2 = e2.vertices[0];
+            var d:Vector2 = e2.vertices[1].sub(e2.vertices[0]);
 
             if (d.len() == 0) {
                 return false;
@@ -332,19 +202,19 @@ package {
                 var s:Number = a.sub(c).cross(b) / d.cross(b);
                 var t:Number = a.sub(c).cross(d) / d.cross(b);
 
-                return s >= 0 && s <= 1 && t >= 0 && t <= 1;
+                return s >= -0.001 && s <= 1.001 && t >= -0.001 && t <= 1.001;
             }
 
             if (a.sub(c).cross(d) == 0) {
-                var p1:Vector2 = e1.v1.sub(e2.v1);
-                var p2:Vector2 = e1.v2.sub(e2.v1);
+                var p1:Vector2 = e1.vertices[0].sub(e2.vertices[0]);
+                var p2:Vector2 = e1.vertices[1].sub(e2.vertices[0]);
 
                 if (p1.dot(p2) < 0) {
                     return true;
                 }
 
-                var q1:Vector2 = e1.v1.sub(e2.v2);
-                var q2:Vector2 = e1.v2.sub(e2.v2);
+                var q1:Vector2 = e1.vertices[0].sub(e2.vertices[1]);
+                var q2:Vector2 = e1.vertices[1].sub(e2.vertices[1]);
 
                 return q1.dot(p2) < 0;
             }
@@ -358,8 +228,8 @@ package {
             }
             else {
                 var seed:Vector2  = new Vector2(e.stageX, e.stageY);
-
-                marshmallows(seed);
+                trace("marshmallow: ", seed);
+                marshmallow(seed);
                 
                 positive_polygons = positive_polygons.concat(negative_polygons);
                 negative_polygons.length = 0;
@@ -369,7 +239,7 @@ package {
 
         private function addPoint(px:Number, py:Number):void {
             var v:Vector2 = new Vector2(px, py);
-
+            trace("add point ", v);
             points.push(v);
 
             var p:Sprite = new Dragable(stage, v, points.length - 1);
@@ -409,47 +279,26 @@ package {
 
                     
 
-            bottom.graphics.moveTo(p.edges[0].v1.x, p.edges[0].v1.y);
+            bottom.graphics.moveTo(p.edges[0].vertices[0].x, p.edges[0].vertices[0].y);
 
             for (var i:int = 0; i < p.edges.length; ++i) {
                 bottom.graphics.lineStyle(1, p.edges[i].color);
-                bottom.graphics.lineTo(p.edges[i].v2.x, p.edges[i].v2.y);
+                bottom.graphics.lineTo(p.edges[i].vertices[1].x, p.edges[i].vertices[1].y);
             }
             bottom.graphics.endFill();
 
-            if (p.showPoints) {
+
+
+        }
+
+        private function drawPoints(p:Polygon):void {
+            if (true || p.showPoints) {
                 for each (var v:Vector2 in p.points) {
-                    bottom.graphics.beginFill(p.edges[0].color);
+                    bottom.graphics.beginFill(p.vertex_color);
                     bottom.graphics.drawCircle(v.x, v.y, 4);
                     bottom.graphics.endFill();
                 }
             }
-
-            if (showNormals) {
-                for each (var e:Edge in p.edges) {
-                    if (!e.canGrow) {
-                        continue;
-                    }
-                    bottom.graphics.moveTo(e.v1.x, e.v1.y);
-                    var d:Vector2 = e.normal1.mul(16);
-                    bottom.graphics.lineTo(e.v1.x + d.x, e.v1.y + d.y);
-                    
-                    bottom.graphics.beginFill(0xff0000);
-                    bottom.graphics.drawCircle(e.v1.x + d.x, e.v1.y + d.y, 2);
-                    bottom.graphics.endFill();
-                
-
-                    bottom.graphics.moveTo(e.v2.x, e.v2.y);
-                    d = e.normal2.mul(16);
-                    bottom.graphics.lineTo(e.v2.x + d.x, e.v2.y + d.y);
-
-                    bottom.graphics.beginFill(0xff0000);
-                    bottom.graphics.drawCircle(e.v2.x + d.x, e.v2.y + d.y, 2);
-                    bottom.graphics.endFill();
-                    
-                }
-            }
-
         }
 
 
@@ -458,6 +307,10 @@ package {
             
             for each (var p:Polygon in positive_polygons) {
                 drawPoly(p, p.color, false);
+            }
+
+            for each (var p:Polygon in positive_polygons) {
+                drawPoints(p);
             }
 
 
@@ -490,19 +343,6 @@ package {
 
             return false;
         }
-
-
-        private function insideTriangle(px:Number, py:Number):int {
-            for (var i:int = 0; i < triangles.length; ++i) {
-                if (triangles[i].inside(px, py)) {
-                    return i;
-                }
-            }
-
-            return -1;
-            
-        }
-
 
     }
 }
