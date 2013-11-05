@@ -101,6 +101,10 @@ package {
         }
 
         private function marshmallow(seed:Vector2):void {
+            if (insidePolygon(positive_polygons, seed)) {
+                return;
+            }
+
             negative_polygons.push(createPolygon(seed));
             var polys:Vector.<Polygon> = negative_polygons.concat(positive_polygons);
 
@@ -118,8 +122,19 @@ package {
                                 var dir_edge:Edge = edge.grow(j);
                                 var e1:Edge = isColliding(positive_polygons, dir_edge);
                                 var e2:Edge = isColliding(positive_polygons, edge);
+                                var e3:Edge;
+                                if (j == 0) {
+                                    var prev:int = i - 1;
+                                    if (prev < 0) {
+                                        prev = polygon.edges.length - 1;
+                                    }
+                                    e3 = isColliding(positive_polygons, polygon.edges[prev]);
+                                }
+                                else {
+                                    e3 = isColliding(positive_polygons, polygon.edges[ ( i + 1 ) % polygon.edges.length ]);
+                                }
                                 if ( inStage(edge.vertices[j]) && polygon.isConvex()) {
-                                    if (e1 == null && e2 == null && checkPolygon(positive_polygons, polygon)) {
+                                    if (e1 == null && e2 == null && e3 == null) {
                                         stillgrowing = true;
                                     }
                                     else if (e1 != null  && ! ( e1 in polygon.divided ) ) {

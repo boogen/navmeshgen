@@ -104,7 +104,7 @@ package {
 
                 var cross:Number= v1.cross(v2);
 
-                if (cross <= 0) {
+                if (cross < 0) {
                     return false;
                 }
             }
