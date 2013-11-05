@@ -107,11 +107,11 @@ package {
 
             negative_polygons.push(createPolygon(seed));
             var polys:Vector.<Polygon> = negative_polygons.concat(positive_polygons);
+        }
 
-            var stillgrowing:Boolean = true;
+        private function grow():Boolean {
+            var stillgrowing:Boolean = false;
 
-            while (stillgrowing) {
-                stillgrowing = false;
                 
                 for each (var polygon:Polygon in negative_polygons) {
                     for (var i:int = 0; i < polygon.edges.length; ++i) {
@@ -160,12 +160,15 @@ package {
                         }
                     }
                 }
-            }
             
 
-            positive_polygons = positive_polygons.concat(negative_polygons);
-            negative_polygons.length = 0;
+            if (!stillgrowing) {
+                trace("finished");
+                positive_polygons = positive_polygons.concat(negative_polygons);
+                negative_polygons.length = 0;
+            }
 
+            return stillgrowing;
         }
 
 
@@ -246,8 +249,6 @@ package {
                 trace("marshmallow: ", seed);
                 marshmallow(seed);
                 
-                positive_polygons = positive_polygons.concat(negative_polygons);
-                negative_polygons.length = 0;
             }
          
         }
@@ -318,11 +319,18 @@ package {
 
 
         private function tick(e:Event):void {
+
+            grow();
             bottom.graphics.clear();
             
             for each (var p:Polygon in positive_polygons) {
                 drawPoly(p, p.color, false);
             }
+
+            for each (var p:Polygon in negative_polygons) {
+                drawPoly(p, p.color, false);
+            }
+
 
             for each (var p:Polygon in positive_polygons) {
                 drawPoints(p);
