@@ -106,10 +106,11 @@ package {
             }
 
             negative_polygons.push(createPolygon(seed));
-            var polys:Vector.<Polygon> = negative_polygons.concat(positive_polygons);
+
         }
 
         private function grow():Boolean {
+            var polys:Vector.<Polygon> = negative_polygons.concat(positive_polygons);
             var stillgrowing:Boolean = false;
 
                 
@@ -120,18 +121,18 @@ package {
                         for (var j:int = 0; j < 2; ++j) {
                             if (edge.normals[j].len() > 0) {
                                 var dir_edge:Edge = edge.grow(j);
-                                var e1:Edge = isColliding(positive_polygons, dir_edge);
-                                var e2:Edge = isColliding(positive_polygons, edge);
+                                var e1:Edge = isColliding(polys, polygon, dir_edge);
+                                var e2:Edge = isColliding(polys, polygon, edge);
                                 var e3:Edge;
                                 if (j == 0) {
                                     var prev:int = i - 1;
                                     if (prev < 0) {
                                         prev = polygon.edges.length - 1;
                                     }
-                                    e3 = isColliding(positive_polygons, polygon.edges[prev]);
+                                    e3 = isColliding(polys, polygon, polygon.edges[prev]);
                                 }
                                 else {
-                                    e3 = isColliding(positive_polygons, polygon.edges[ ( i + 1 ) % polygon.edges.length ]);
+                                    e3 = isColliding(polys, polygon, polygon.edges[ ( i + 1 ) % polygon.edges.length ]);
                                 }
                                 if ( inStage(edge.vertices[j]) && polygon.isConvex()) {
                                     if (e1 == null && e2 == null && e3 == null) {
@@ -179,7 +180,7 @@ package {
 
         private function checkPolygon(polys:Vector.<Polygon>, p:Polygon):Boolean {
             for each (var e:Edge in p.edges) {
-                if ( isColliding(polys, e) ) {
+                if ( isColliding(polys, p, e) ) {
                     return false;
                 }
             }
@@ -187,11 +188,13 @@ package {
             return true;
         }
 
-        private function isColliding(polys:Vector.<Polygon>, e:Edge):Edge {
+        private function isColliding(polys:Vector.<Polygon>, poly:Polygon, e:Edge):Edge {
             for each (var p:Polygon in polys) {
-                for each (var edge:Edge in p.edges) {
-                    if ( intersects( e, edge ) ) {
-                        return edge;
+                if (poly != p) {
+                    for each (var edge:Edge in p.edges) {
+                        if ( intersects( e, edge ) ) {
+                            return edge;
+                        }
                     }
                 }
             }
